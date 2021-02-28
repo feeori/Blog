@@ -34,7 +34,7 @@ draft: false
 
 居然出现了块丢失，不是有副本么？怎么会出现找不到的数据块？去HDFS日志里翻翻，希望能找到关于这个丢失块的日志。
 
-## HDFS日志中，发现map.xml对应的block副本数被设置为1
+### HDFS日志中，发现map.xml对应的block副本数被设置为1
 文件创建的时候，3e2b0e34-257d-4249-ac52-97786b1a39e0/map.xml在以下三个节点上，此时确实是3副本：10.10.15.75（挂掉的datanode14）, 10.10.15.63(datanode2)，10.10.15.66(datanode5)：
 ![map xml location](/img/0001-mapreduce-job-fail-due-to-wrong-setting/02-map-xml-location.png)
 
@@ -47,13 +47,13 @@ draft: false
 
 到目前为止，大概了解此次故障的过程了：Hive创建任务时，任务文件map.xml有3个副本，但后面副本数被降低到1。而唯一的副本，刚好在挂掉的datanode14上。。datanode14挂机后，唯一的副本丢失，导致这部分的Hive任务即使重试，最终也会失败。
 
-## 非故障时间，map.xml的副本数都会从3变为1
+### 非故障时间，map.xml的副本数都会从3变为1
 日志里继续搜寻，发现非故障时间段，MR任务的jar包，map.xml，reduce.xml的副本数，也会从3变为1。
 ![map xml replication decrease to one](/img/0001-mapreduce-job-fail-due-to-wrong-setting/06-other-xml-decrease-to-one.png)
 
 发现大规模的、有规律的日志，因此开始认定，不是偶然或人为操作导致副本降为1，应该是哪里的配置出了问题。
 
-## 撸代码
+### 撸代码
 查看代码，发现往远程拷贝MR任务相关的文件时，会执行setReplication，把副本数设置为mapreduce.client.submit.file.replication。
 ```Java
 public static final String SUBMIT_REPLICATION =
@@ -79,7 +79,7 @@ private void copyJar(Path originalJarPath, Path submitJarFile,
 }
 ```
 
-## 错误配置，罪魁祸首
+### 错误配置，罪魁祸首
 查看线上YARN配置，发现`mapreduce.client.submit.file.replication`的值改为了1（默认是3）。。
 ![map xml replication decrease to one](/img/0001-mapreduce-job-fail-due-to-wrong-setting/07-wrong-setting.png)
 
